@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
 project(bhopal)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 23)
 
 # Jeśli folder SFML nie istnieje, pobierz i rozpakuj archiwum.
 if(NOT EXISTS "${CMAKE_SOURCE_DIR}/lib/SFML-3.0.0/CMakeLists.txt")
@@ -21,8 +21,8 @@ endif()
 
 
 # Jeśli folder boost nie istnieje, pobierz i rozpakuj archiwum.
-if(NOT EXISTS "${CMAKE_SOURCE_DIR}/lib/boost-1.87.0/CMakeLists.txt")
-    message(STATUS "boost nie znaleziono w lib/boost-1.87.0 Pobieranie i rozpakowywanie archiwum SFML...")
+if(NOT EXISTS "${CMAKE_SOURCE_DIR}/lib/boost-1.87.0/boost/asio.hpp")
+    message(STATUS "boost nie znaleziono w lib/boost-1.87.0/boost/asio.hpp downloading and unziping boost...")
     set(BOOST_ZIP "${CMAKE_BINARY_DIR}/boost-1.87.0.zip")
     file    (   DOWNLOAD
                 "https://github.com/bajraan/BHOPAL-ComDisplayer/releases/download/Library/boost-1.87.0.zip"
@@ -37,14 +37,36 @@ if(NOT EXISTS "${CMAKE_SOURCE_DIR}/lib/boost-1.87.0/CMakeLists.txt")
 endif()
 
 
-# Dodaj Boost (nagłówki tylko)
+# add Boost as header-only
 include_directories(lib/boost-1.87.0)
 
-# Dodaj SFML jako subproject
+# add nlohmann as header-only
+include_directories(lib/nlohmann-3.12.0)
+
+# add SFML as subproject
 add_subdirectory(lib/SFML-3.0.0)
 
-# Twój plik źródłowy
-add_executable(BHOPAL src/main.cpp)
+
+# Include project-specific include folders
+include_directories(
+    src
+    src/Config
+    src/Utils
+    src/DataGrabber
+    src/DataDisplayer
+
+)
+
+# Application source files
+add_executable(BHOPAL
+
+    src/Config/InterfaceConfigLoader.cpp
+    src/DataGrabber/DataGrabbSerial.cpp
+    src/DataDisplayer/DataDispSFML.cpp
+    src/Utils/AppEnvironment.cpp
+    src/main.cpp
+    
+)
 
 # Połącz z bibliotekami SFML
 target_link_libraries(BHOPAL
@@ -60,4 +82,11 @@ endif()
 # Folder wyjściowy aplikacji
 set_target_properties(BHOPAL PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/application"
+)
+# Ustaw możłiwość odpalenia aplikacji za pomocą CMake
+add_custom_target(run
+    COMMAND $<TARGET_FILE:BHOPAL>
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/application
+    DEPENDS BHOPAL
+    USES_TERMINAL
 )

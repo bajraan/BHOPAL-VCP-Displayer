@@ -1,55 +1,103 @@
-#include <SFML/Graphics.hpp>
-#include <boost/asio.hpp>
-#include <iostream>
+#include <thread>
+#include <chrono>
+#include <iomanip>
+
+
+#include "Utils/AppEnvironment.hpp"
+
+#include "DataGrabber/DataGrabbSerial.hpp"
+
+#include "DataDisplayer/DataDispSFML.hpp"
+#include "DataDisplayer/FactoryDisplay.hpp"
+#include "__FlowPass/FlowPass.hpp"
+#include "__FlowPass/FactoryFlowPass.hpp"
+
+#include "__Core/Core.hpp"
+
+#include "PreTest_compiler/PreTest_compiler.hpp"
+#include "PreTest_sfml/PreTest_sfml.hpp"
+#include "PreTest_boost/PreTest_boost.hpp"
+#include "PreTest_nlohmann/PreTest_nlohmann.hpp"
+
+
+
+// PROJECT IMPLEMENTATION STATUS
+// grabberSerial implemented
+// collectorSerial implemented
+// regexer not impl
+// flow not impl
+// displayer SFML implemented
+// temp displaying in main looP
+
+
+// TODO: .json remove phy_name form the flowPass becase flowpass
+// currently besed only on disp_name ( from disp_name to disp_name )
+// BUG: brak poprawnej inicjalizacji displayera jeśli dane nie przychodzą
+
 
 int main()
 {
-    std::cout << "Boost version: " 
-              << BOOST_VERSION / 100000 << "."          // major
-              << BOOST_VERSION / 100 % 1000 << "."      // minor
-              << BOOST_VERSION % 100                    // patch
-              << std::endl;
 
-    std::cout << "SFML version: "
-              << SFML_VERSION_MAJOR << "."
-              << SFML_VERSION_MINOR << "."
-              << SFML_VERSION_PATCH << std::endl;
+
+    { PreTest_compiler  pretest; }
+    { PreTest_sfml      pretest; }
+    { PreTest_boost     pretest; }
+    { PreTest_nlohmann  pretest; }
+
     
-    sf::RenderWindow   window(sf::VideoMode({200, 200}), "BHOPAL Displayer", sf::Style::Default );
-    sf::RenderWindow settings(sf::VideoMode({300, 300}), "BHOPAL Settings", sf::Style::None );
-
-    sf::CircleShape shape(100.f);
-    shape.setFillColor(sf::Color(255,10,10));
+    // TODO: OZNACZ JAKO KLASA singleton
+    // Ładowanie konfiguracji portów (plik JSON)                        
+    std::string configPath = getExecutableDir() + "/config.json";          
+    auto config     = std::make_shared<InterfaceConfigLoader>(configPath);
+    auto collector  = std::make_shared<Collector>();
     
-    // boost::asio::io_context io;
-    // boost::asio::serial_port serial(io, "COM5");
-    // //Configure basic serial port parameters: 115.2kBaud, 8N1
-    // serial.set_option(boost::asio::serial_port_base::baud_rate(9600));
-    // serial.set_option(boost::asio::serial_port_base::character_size(8 /* data bits */));
-    // serial.set_option(boost::asio::serial_port_base::parity(boost::asio::serial_port_base::parity::none));
-    // serial.set_option(boost::asio::serial_port_base::stop_bits(boost::asio::serial_port_base::stop_bits::one));
 
-    // while(true) 
-    // {
-    //     char data[256];
-    //     size_t n = serial.read_some(boost::asio::buffer(data, 256));
-    //     // Write data to stdout
-    //     std::cout.write(data, n);
-    // }
+    config->printSummary();
 
-    while (window.isOpen())
+    
+    Core core   ( 
+                    FactoryDisplay::produce(collector,config),
+                    FactoryFlowPass::produce(collector,config)
+                );
+    core.init();
+
+
+    //===========================================================================================================
+    //===========================================================================================================
+    // TODO create Factory  -> IGrabber     -> GrabberSerial
+    //                                      -> GrabberEthernet
+    //                                      -> GrabberUSB   
+    //===========================================================================================================
+    // Graber danych
+    //===========================================================================================================
+    DataGrabbSerial grabberSerial(config,collector) ;
+    grabberSerial.interfacesInit();
+    // Start grabbera w osobnym wątku
+    std::thread serialThread([&]()             
     {
-        while (const std::optional event = window.pollEvent())
+        try
         {
-            if (event->is<sf::Event::Closed>())
-                window.close();
+            grabberSerial.interfacesStart(); // zawiera io.run()
+        } catch (const std::exception& e) {
+            std::cerr << "[Thread Error] " << e.what() << std::endl;
+        } catch (...) {
+            std::cerr << "[Thread Error] Unknows Exception in grabber threrad.\n";
         }
+    });
+    //===========================================================================================================
+    //===========================================================================================================
 
-        window.clear( sf::Color(10,10,10,100) );
-        window.draw(shape);
-        window.display();
+    
+    for (int i = 0; i < 600; ++i) 
+    {
+        core.run();
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
 
-        settings.clear();
-        settings.display();
+
+    grabberSerial.interfacesStop(); // wymusza zakończenie run()
+    // Dodajemy join, żeby wątek zakończył się przed końcem programu
+    if (serialThread.joinable()) {
+        serialThread.join();
     }
 }

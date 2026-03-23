@@ -1,0 +1,10 @@
+
+
+// 1 delete whole data from /build
+// execute the command :
+PS D:\00__PROJEKTY\2025_0416_BHOPAL __GIT__\build> cmake .. -G "MinGW Makefiles"
+
+// run the build process
+PS D:\00__PROJEKTY\2025_0416_BHOPAL__GIT__> cmake --build . -j8
+
+// run the application

@@ -31,6 +31,11 @@ CTestTestfile.cmake
 # Ignore auto-downloaded SFML library
 /lib/
 
+# Ignore applications folders
+/__00__diary
+/application
+/application_TestSender
+
 # Ignore dev-diary documentation
 /__00__diary
 
